@@ -1,4 +1,6 @@
-# group_loss: Hierarchical Structured Regularization
+# group_loss: Hierarchical Structured Regularization 
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/avdosev/group_loss)
 
 **group_loss** — механизм иерархической регуляризации для нейронных сетей, позволяющий применять **структурированные штрафы** (L1/L2) к группам параметров модели в соответствии с их архитектурной иерархией. Реализует идею «групповой разреженности», где параметры регулируются не по отдельности, а как семантические блоки.
 
