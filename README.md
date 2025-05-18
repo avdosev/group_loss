@@ -4,14 +4,14 @@
 
 ## Ключевые особенности:
 - **Групповая регуляризация**:
-  - `level1`: Отдельные фильтры/нейроны
+  - `base_level`: Отдельные фильтры/нейроны
   - `layer`: Целые слои (например, Residual-блоки в ResNet)
   - `block`: Архитектурные блоки (MoE expert, отсутвует в ResNet)
 - **Гибкие комбинации норм**:
   ```python
   # Пример: L1 для фильтров + L2 для блоков
   config = [
-      {"groups": ["level1"], "norm": "L1", "lambda": 0.001},
+      {"groups": ["base_level"], "norm": "L1", "lambda": 0.001},
       {"groups": ["layer"],  "norm": "L2", "lambda": 0.01}
   ]
   ```
@@ -28,7 +28,7 @@ model = HierarchicalResNet(num_blocks=[2, 2, 2, 2], num_class=10)
 
 # Конфигурация регуляризации
 config = [
-    {"groups": ["level1"], "norm": "L2", "lambda": 0.001} # L2 для фильтров
+    {"groups": ["base_level"], "norm": "L2", "lambda": 0.001} # L2 для фильтров
     {"groups": ["layer"], "norm": "L1", "lambda": 0.01},  # L1 для Residual-слоев
 ]
 
@@ -42,7 +42,7 @@ loss = criterion(outputs, labels) + regularizer.compute_loss(config)
 На примере ResNet
 | Группа     | Тип нормы | Результат                          | Визуализация                     |
 |------------|-----------|------------------------------------|----------------------------------|
-| `level1`   | L1        | Разреженные фильтры                | ░ █ ░ ░ █ (активные фильтры)     |
+| `base_level`   | L1        | Разреженные фильтры                | ░ █ ░ ░ █ (активные фильтры)     |
 | `layer`    | L1+L2     | Удаленные Residual-блоки           | [Block1] ░ [Block3] (Block2 ≈ 0) |
 | `block`    | L2        | Архитектурные блоки                | TODO                             |
 

@@ -6,7 +6,7 @@
   
 - **groups**:
   - `None` - без группировки (для global)
-  - `level1` - группировка по фильтрам/нейронам
+  - `base_level` - группировка по фильтрам/нейронам
   - `layer` - группировка по слоям
   - `blocks` - группировка по архитектурным блокам
 
@@ -23,13 +23,13 @@ reg_config = {
     "type": "hierarchical",  # Может быть: global/layerwise/hierarchical
     "norm": "L2",            # Применяемая норма для этого уровня
     "lambda": 0.01,          # Коэффициент регуляризации
-    "groups": None,          # Группировка параметров: None/level1/layer/blocks
+    "groups": None,          # Группировка параметров: None/base_level/layer/blocks
     "children": [            # Вложенные регуляризаторы (для hierarchical)
         {
             "type": "layerwise",
             "norm": "L1",
             "lambda": 0.001,
-            "groups": "level1"  # Группировка по фильтрам/нейронам
+            "groups": "base_level"  # Группировка по фильтрам/нейронам
         },
         {
             "type": "global",
@@ -79,13 +79,13 @@ global_l2 = {
 }
 ```
 
-4. **Структурированная L1 по Level1**:
+4. **Структурированная L1 по base_level**:
 ```python
-structured_level1 = {
+structured_base_level = {
     "type": "layerwise",
     "norm": "L1",
     "lambda": 0.01,
-    "groups": "level1"  # Группировка по фильтрам/нейронам
+    "groups": "base_level"  # Группировка по фильтрам/нейронам
 }
 ```
 
@@ -106,7 +106,7 @@ combined_hierarchy = {
                     "type": "layerwise",
                     "norm": "L2",
                     "lambda": 0.001,
-                    "groups": "level1"
+                    "groups": "base_level"
                 }
             ]
         },

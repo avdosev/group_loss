@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from group_loss.base_classes import HierarchicalModule
+from group_loss.base_classes import HierarchicalGroup, HierarchicalModule, extract_groups, make_hierarchy
 from group_loss.default_modules import HierarchicalConv2d, HierarchicalLinear
 
 from typing import List
@@ -15,24 +15,24 @@ class HierarchicalResBlock(HierarchicalModule):
         
         self.conv1 = HierarchicalConv2d(
             in_planes, planes, kernel_size=3,
-            param_groups=['level1', 'block'],
+            param_groups=['base_level'],
             stride=stride, padding=1, bias=False
         )
         self.bn1 = nn.BatchNorm2d(planes)
         
         self.conv2 = HierarchicalConv2d(
             planes, planes, kernel_size=3,
-            param_groups=['level1', 'block'],
+            param_groups=['base_level'],
             stride=1, padding=1, bias=False
         )
         self.bn2 = nn.BatchNorm2d(planes)
 
-        self.shortcut = nn.Sequential()
+        self.shortcut = nn.Identity()
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(
                 HierarchicalConv2d(
                     in_planes, planes, kernel_size=1,
-                    param_groups=['level1', 'block'],
+                    param_groups=['shortcut', 'base_level'],
                     stride=stride, bias=False
                 ),
                 nn.BatchNorm2d(planes)
@@ -49,6 +49,16 @@ class HierarchicalResBlock(HierarchicalModule):
         out += self.shortcut(x)
         out = nn.ReLU()(out)
         return out
+    
+
+    def get_param_groups(self) -> List[HierarchicalGroup]:
+        return make_hierarchy(
+            extract_groups(self.shortcut) + \
+            make_hierarchy([
+                self.conv1, self.conv2
+            ], 'layer'),
+        'block', name='ResNetBlock')
+        
 
 class HierarchicalResNet(HierarchicalModule):
     """Полная реализация ResNet с иерархической группировкой"""
@@ -57,7 +67,7 @@ class HierarchicalResNet(HierarchicalModule):
         self.in_planes = 64
 
         self.conv1 = HierarchicalConv2d(3, 64, kernel_size=3,
-                                      param_groups=['level1', 'layer'],
+                                      param_groups=['base_level', 'heels'],
                                       stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -68,7 +78,7 @@ class HierarchicalResNet(HierarchicalModule):
         self.layer4 = self._make_layer(512, num_blocks[3], stride=2)
         
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = HierarchicalLinear(512, num_classes, param_groups=['layer'])
+        self.fc = HierarchicalLinear(512, num_classes, param_groups=['head'])
 
     def _make_layer(self, planes: int, num_blocks: int, stride: int) -> nn.Sequential:
         layers = []
