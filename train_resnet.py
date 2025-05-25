@@ -56,21 +56,21 @@ if __name__ == "__main__":
     regularizer_L1 = HierarchicalRegularizer({
             "type": "global",
             "norm": "L1",
-            "lambda": 0.1,
+            "lambda": 0.05,
     })
 
     ### L2 = sum(weights**2)
     regularizer_L2 = HierarchicalRegularizer({
             "type": "global",
             "norm": "L2",
-            "lambda": 0.1,
+            "lambda": 0.05,
     })
     regularizer_group_lasso = HierarchicalRegularizer({
     "type": "layerwise",
     "groups": "base_level",
     "norm": "L1",          # L1 по фильтрам
     "inner_norm": "L2",    # L2 внутри фильтра
-    "lambda": 0.02
+    "lambda": 0.05
     })
 
     # Пример прямого прохода
