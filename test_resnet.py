@@ -14,14 +14,14 @@ model = get_resnet18(num_classes)
 regularizer_L1 = HierarchicalRegularizer({
         "type": "global",
         "norm": "L1",
-        "lambda": 0.1,
+        "lambda": 0.05,
 })
 
 ### L2 = sum(weights**2)
 regularizer_L2 = HierarchicalRegularizer({
         "type": "global",
         "norm": "L2",
-        "lambda": 0.1,
+        "lambda": 0.05,
 })
 regularizer_group_lasso = HierarchicalRegularizer({
     "type": "layerwise",

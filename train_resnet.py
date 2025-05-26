@@ -12,7 +12,13 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = 'cpu'
+if torch.cuda.is_available():
+    device = 'cuda'
+elif torch.backends.mps.is_available():
+    device = 'mps'
+
+device = torch.device(device)
 
 
 def train(model, trainloader, epochs=10):
@@ -43,7 +49,9 @@ def train(model, trainloader, epochs=10):
 
             total_loss += loss.item()
 
-        print(f"Epoch {epoch+1}, Loss: {total_loss:.4f}")
+        print(f"Epoch {epoch+1}, Last Loss: {loss.item():.4f}")
+        print(f"Epoch {epoch+1}, Total Loss: {total_loss:.4f}")
+        print(f"Epoch {epoch+1}, Avg Loss: {total_loss / len(trainloader):.4f}")
     writer.close()
 
 if __name__ == "__main__":
@@ -66,17 +74,12 @@ if __name__ == "__main__":
             "lambda": 0.05,
     })
     regularizer_group_lasso = HierarchicalRegularizer({
-    "type": "layerwise",
-    "groups": "base_level",
-    "norm": "L1",          # L1 по фильтрам
-    "inner_norm": "L2",    # L2 внутри фильтра
-    "lambda": 0.05
+        "type": "layerwise",
+        "groups": "base_level",
+        "norm": "L1",          # L1 по фильтрам
+        "inner_norm": "L2",    # L2 внутри фильтра
+        "lambda": 0.05
     })
-
-    # Пример прямого прохода
-
-    input_tensor = torch.randn(1, 3, 224, 224)
-    output = model(input_tensor)
 
     regularization_loss_l1 = regularizer_L1.forward(model)
     regularization_loss_l2 = regularizer_L2.forward(model)
@@ -92,4 +95,4 @@ if __name__ == "__main__":
     regularizer = regularizer_L1
     # === Run ===
     model = model.to(device)
-    train(model, trainloader, epochs=1)
+    train(model, trainloader, epochs=10)
