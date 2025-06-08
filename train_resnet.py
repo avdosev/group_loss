@@ -101,7 +101,12 @@ def weight_statistics(model: nn.Module, threshold: float = 1e-5) -> Dict[str, fl
 
 
 def filter_statistics(model: nn.Module, threshold: float = 1e-5) -> Dict[str, float]:
-    """Return counts of zero and near-zero filters and linear neurons."""
+    """Return counts of zero and near-zero filters and linear neurons.
+
+    The counting relies on :meth:`HierarchicalGroupWrapper.count_zero_groups`,
+    which internally normalises criteria for convolutional and linear layers,
+    ensuring fair comparison between them.
+    """
     conv_zeros = 0
     conv_near_zeros = 0
     conv_total = 0
