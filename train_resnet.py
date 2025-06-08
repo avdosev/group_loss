@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from group_loss.group_loss import HierarchicalRegularizer
+from group_loss.default_modules import HierarchicalConv2d, HierarchicalLinear
 from resnet import get_resnet34, get_resnet18
 
 import torchvision
@@ -98,6 +99,26 @@ def weight_statistics(model: nn.Module, threshold: float = 1e-5) -> Dict[str, fl
         "near_zeros": near_zeros,
     }
 
+
+def filter_statistics(model: nn.Module, threshold: float = 1e-5) -> Dict[str, float]:
+    """Return counts of zero and near-zero filters/neuron weights."""
+    zero_filters = 0
+    near_zero_filters = 0
+    total_filters = 0
+    for module in model.modules():
+        if isinstance(module, (HierarchicalConv2d, HierarchicalLinear)):
+            w = module.get_weights().detach().cpu()  # [out_features, ...]
+            norms = torch.norm(w, p=2, dim=1)
+            total_filters += norms.numel()
+            zero_filters += (norms == 0).sum().item()
+            near_zero_filters += ((norms < threshold) & (norms != 0)).sum().item()
+
+    return {
+        "total": total_filters,
+        "zeros": zero_filters,
+        "near_zeros": near_zero_filters,
+    }
+
 if __name__ == "__main__":
     num_classes = 10
 
@@ -147,6 +168,7 @@ if __name__ == "__main__":
         train(model, trainloader, regularizer=reg, writer=writer, epochs=10)
         acc = evaluate(model, testloader)
         stats = weight_statistics(model)
+        filter_stats = filter_statistics(model)
 
         writer.add_scalar("Eval/Accuracy", acc, 0)
         writer.add_scalar("Weights/Zero_fraction", stats["zeros"] / stats["total"], 0)
@@ -155,14 +177,27 @@ if __name__ == "__main__":
             stats["near_zeros"] / stats["total"],
             0,
         )
+        writer.add_scalar("Filters/Zero_fraction", filter_stats["zeros"] / filter_stats["total"], 0)
+        writer.add_scalar(
+            "Filters/Near_zero_fraction",
+            filter_stats["near_zeros"] / filter_stats["total"],
+            0,
+        )
         writer.close()
 
         results[name] = {
             "accuracy": acc,
             "zero_frac": stats["zeros"] / stats["total"],
             "near_zero_frac": stats["near_zeros"] / stats["total"],
+            "filter_zero_frac": filter_stats["zeros"] / filter_stats["total"],
+            "filter_near_zero_frac": filter_stats["near_zeros"] / filter_stats["total"],
         }
 
     print("\n=== Summary ===")
     for k, v in results.items():
-        print(f"{k}: accuracy={v['accuracy']:.2f}%, zeros={v['zero_frac']:.4f}, near_zeros={v['near_zero_frac']:.4f}")
+        print(
+            f"{k}: accuracy={v['accuracy']:.2f}%, "
+            f"zeros={v['zero_frac']:.4f}, near_zeros={v['near_zero_frac']:.4f}, "
+            f"zero_filters={v['filter_zero_frac']:.4f}, "
+            f"near_zero_filters={v['filter_near_zero_frac']:.4f}"
+        )
