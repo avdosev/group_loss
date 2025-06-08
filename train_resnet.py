@@ -12,6 +12,7 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+import os
 from typing import Optional, Dict
 
 
@@ -30,6 +31,7 @@ def train(
     regularizer: Optional[HierarchicalRegularizer] = None,
     writer: Optional[SummaryWriter] = None,
     epochs: int = 10,
+    md_path: Optional[str] = None,
 ) -> None:
     model.train()
     criterion = nn.CrossEntropyLoss()
@@ -61,9 +63,24 @@ def train(
 
             total_loss += loss.item()
 
-        print(f"Epoch {epoch+1}, Last Loss: {loss.item():.4f}")
+        last = loss.item()
+        avg = total_loss / len(trainloader)
+        print(f"Epoch {epoch+1}, Last Loss: {last:.4f}")
         print(f"Epoch {epoch+1}, Total Loss: {total_loss:.4f}")
-        print(f"Epoch {epoch+1}, Avg Loss: {total_loss / len(trainloader):.4f}")
+        print(f"Epoch {epoch+1}, Avg Loss: {avg:.4f}")
+
+        if md_path is not None:
+            header = "| Epoch | Last Loss | Total Loss | Avg Loss |\n"
+            sep = "| --- | --- | --- | --- |\n"
+            row = f"| {epoch+1} | {last:.4f} | {total_loss:.4f} | {avg:.4f} |\n"
+            if not os.path.exists(md_path) or epoch == 0:
+                with open(md_path, "w") as f:
+                    f.write(header)
+                    f.write(sep)
+                    f.write(row)
+            else:
+                with open(md_path, "a") as f:
+                    f.write(row)
     writer.close()
 
 
@@ -211,7 +228,14 @@ if __name__ == "__main__":
         print(f"\n=== Training with {name} ===")
         model = get_resnet18(num_classes).to(device)
         writer = SummaryWriter(f"runs/{name}")
-        train(model, trainloader, regularizer=reg, writer=writer, epochs=10)
+        train(
+            model,
+            trainloader,
+            regularizer=reg,
+            writer=writer,
+            epochs=10,
+            md_path=f"{name}_train_log.md",
+        )
         acc = evaluate(model, testloader)
         stats = weight_statistics(model)
         filter_stats = filter_statistics(model)
@@ -263,3 +287,19 @@ if __name__ == "__main__":
             f"conv_zero={v['conv_zero_frac']:.4f}, conv_near_zero={v['conv_near_zero_frac']:.4f}, "
             f"linear_zero={v['linear_zero_frac']:.4f}, linear_near_zero={v['linear_near_zero_frac']:.4f}"
         )
+
+    summary_md = "summary_results.md"
+    header = (
+        "| Benchmark | Accuracy | Zero frac | Near zero frac | Conv zero | Conv near zero | "
+        "Linear zero | Linear near zero |\n"
+    )
+    sep = "| --- | --- | --- | --- | --- | --- | --- | --- |\n"
+    with open(summary_md, "w") as f:
+        f.write(header)
+        f.write(sep)
+        for k, v in results.items():
+            f.write(
+                f"| {k} | {v['accuracy']:.2f}% | {v['zero_frac']:.4f} | {v['near_zero_frac']:.4f} | "
+                f"{v['conv_zero_frac']:.4f} | {v['conv_near_zero_frac']:.4f} | "
+                f"{v['linear_zero_frac']:.4f} | {v['linear_near_zero_frac']:.4f} |\n"
+            )
