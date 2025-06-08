@@ -101,22 +101,34 @@ def weight_statistics(model: nn.Module, threshold: float = 1e-5) -> Dict[str, fl
 
 
 def filter_statistics(model: nn.Module, threshold: float = 1e-5) -> Dict[str, float]:
-    """Return counts of zero and near-zero filters/neuron weights."""
-    zero_filters = 0
-    near_zero_filters = 0
-    total_filters = 0
+    """Return counts of zero and near-zero filters and linear neurons."""
+    conv_zeros = 0
+    conv_near_zeros = 0
+    conv_total = 0
+    linear_zeros = 0
+    linear_near_zeros = 0
+    linear_total = 0
     for module in model.modules():
-        if isinstance(module, (HierarchicalConv2d, HierarchicalLinear)):
-            w = module.get_weights().detach().cpu()  # [out_features, ...]
+        if isinstance(module, HierarchicalConv2d):
+            w = module.get_weights().detach().cpu()
             norms = torch.norm(w, p=2, dim=1)
-            total_filters += norms.numel()
-            zero_filters += (norms == 0).sum().item()
-            near_zero_filters += ((norms < threshold) & (norms != 0)).sum().item()
+            conv_total += norms.numel()
+            conv_zeros += (norms == 0).sum().item()
+            conv_near_zeros += ((norms < threshold) & (norms != 0)).sum().item()
+        elif isinstance(module, HierarchicalLinear):
+            w = module.get_weights().detach().cpu()
+            norms = torch.norm(w, p=2, dim=1)
+            linear_total += norms.numel()
+            linear_zeros += (norms == 0).sum().item()
+            linear_near_zeros += ((norms < threshold) & (norms != 0)).sum().item()
 
     return {
-        "total": total_filters,
-        "zeros": zero_filters,
-        "near_zeros": near_zero_filters,
+        "conv_total": conv_total,
+        "conv_zeros": conv_zeros,
+        "conv_near_zeros": conv_near_zeros,
+        "linear_total": linear_total,
+        "linear_zeros": linear_zeros,
+        "linear_near_zeros": linear_near_zeros,
     }
 
 if __name__ == "__main__":
@@ -177,10 +189,24 @@ if __name__ == "__main__":
             stats["near_zeros"] / stats["total"],
             0,
         )
-        writer.add_scalar("Filters/Zero_fraction", filter_stats["zeros"] / filter_stats["total"], 0)
         writer.add_scalar(
-            "Filters/Near_zero_fraction",
-            filter_stats["near_zeros"] / filter_stats["total"],
+            "Conv_filters/Zero_fraction",
+            filter_stats["conv_zeros"] / filter_stats["conv_total"],
+            0,
+        )
+        writer.add_scalar(
+            "Conv_filters/Near_zero_fraction",
+            filter_stats["conv_near_zeros"] / filter_stats["conv_total"],
+            0,
+        )
+        writer.add_scalar(
+            "Linear_units/Zero_fraction",
+            filter_stats["linear_zeros"] / filter_stats["linear_total"],
+            0,
+        )
+        writer.add_scalar(
+            "Linear_units/Near_zero_fraction",
+            filter_stats["linear_near_zeros"] / filter_stats["linear_total"],
             0,
         )
         writer.close()
@@ -189,8 +215,10 @@ if __name__ == "__main__":
             "accuracy": acc,
             "zero_frac": stats["zeros"] / stats["total"],
             "near_zero_frac": stats["near_zeros"] / stats["total"],
-            "filter_zero_frac": filter_stats["zeros"] / filter_stats["total"],
-            "filter_near_zero_frac": filter_stats["near_zeros"] / filter_stats["total"],
+            "conv_zero_frac": filter_stats["conv_zeros"] / filter_stats["conv_total"],
+            "conv_near_zero_frac": filter_stats["conv_near_zeros"] / filter_stats["conv_total"],
+            "linear_zero_frac": filter_stats["linear_zeros"] / filter_stats["linear_total"],
+            "linear_near_zero_frac": filter_stats["linear_near_zeros"] / filter_stats["linear_total"],
         }
 
     print("\n=== Summary ===")
@@ -198,6 +226,6 @@ if __name__ == "__main__":
         print(
             f"{k}: accuracy={v['accuracy']:.2f}%, "
             f"zeros={v['zero_frac']:.4f}, near_zeros={v['near_zero_frac']:.4f}, "
-            f"zero_filters={v['filter_zero_frac']:.4f}, "
-            f"near_zero_filters={v['filter_near_zero_frac']:.4f}"
+            f"conv_zero={v['conv_zero_frac']:.4f}, conv_near_zero={v['conv_near_zero_frac']:.4f}, "
+            f"linear_zero={v['linear_zero_frac']:.4f}, linear_near_zero={v['linear_near_zero_frac']:.4f}"
         )
