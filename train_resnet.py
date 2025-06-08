@@ -110,17 +110,15 @@ def filter_statistics(model: nn.Module, threshold: float = 1e-5) -> Dict[str, fl
     linear_total = 0
     for module in model.modules():
         if isinstance(module, HierarchicalConv2d):
-            w = module.get_weights().detach().cpu()
-            norms = torch.norm(w, p=2, dim=1)
-            conv_total += norms.numel()
-            conv_zeros += (norms == 0).sum().item()
-            conv_near_zeros += ((norms < threshold) & (norms != 0)).sum().item()
+            stats = module.count_zero_groups(threshold)
+            conv_total += stats["total"]
+            conv_zeros += stats["zeros"]
+            conv_near_zeros += stats["near_zeros"]
         elif isinstance(module, HierarchicalLinear):
-            w = module.get_weights().detach().cpu()
-            norms = torch.norm(w, p=2, dim=1)
-            linear_total += norms.numel()
-            linear_zeros += (norms == 0).sum().item()
-            linear_near_zeros += ((norms < threshold) & (norms != 0)).sum().item()
+            stats = module.count_zero_groups(threshold)
+            linear_total += stats["total"]
+            linear_zeros += stats["zeros"]
+            linear_near_zeros += stats["near_zeros"]
 
     return {
         "conv_total": conv_total,

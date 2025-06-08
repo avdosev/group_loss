@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -36,7 +37,16 @@ class HierarchicalGroupWrapper(nn.Module):
     @abstractmethod
     def get_weights(self):
         pass
-    
+
+    def count_zero_groups(self, threshold: float = 1e-5) -> Dict[str, int]:
+        """Return counts of zero and near-zero base-level groups."""
+        w = self.get_weights().detach().cpu()
+        norms = torch.norm(w, p=2, dim=1)
+        total = norms.numel()
+        zeros = (norms == 0).sum().item()
+        near_zeros = ((norms < threshold) & (norms != 0)).sum().item()
+        return {"total": total, "zeros": zeros, "near_zeros": near_zeros}
+
     def forward(self, x):
         return self.module.forward(x)
 
