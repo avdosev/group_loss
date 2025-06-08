@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -36,7 +37,23 @@ class HierarchicalGroupWrapper(nn.Module):
     @abstractmethod
     def get_weights(self):
         pass
-    
+
+    def count_zero_groups(self, threshold: float = 1e-5) -> Dict[str, int]:
+        """Return counts of zero and near-zero base-level groups.
+
+        A group is considered **zero** if *all* its weights equal zero.
+        It is **near-zero** if the maximum absolute value within the group is
+        below ``threshold`` while not being exactly zero.  This heuristic makes
+        the criterion independent of the number of weights in a group and thus
+        comparable across convolutional and linear layers.
+        """
+        w = self.get_weights().detach().cpu()
+        abs_max = w.abs().max(dim=1).values
+        total = abs_max.numel()
+        zeros = (abs_max == 0).sum().item()
+        near_zeros = ((abs_max < threshold) & (abs_max != 0)).sum().item()
+        return {"total": total, "zeros": zeros, "near_zeros": near_zeros}
+
     def forward(self, x):
         return self.module.forward(x)
 
