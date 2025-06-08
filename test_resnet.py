@@ -21,14 +21,14 @@ regularizer_L1 = HierarchicalRegularizer({
 regularizer_L2 = HierarchicalRegularizer({
         "type": "global",
         "norm": "L2",
-        "lambda": 0.05,
+        "lambda": 0.0012,
 })
 regularizer_group_lasso = HierarchicalRegularizer({
     "type": "layerwise",
     "groups": "base_level",
     "norm": "L1",          # L1 по фильтрам
     "inner_norm": "L2",    # L2 внутри фильтра
-    "lambda": 0.02
+    "lambda": 0.0035
 })
 
 # Пример прямого прохода

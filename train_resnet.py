@@ -137,25 +137,6 @@ def filter_statistics(model: nn.Module, threshold: float = 1e-5) -> Dict[str, fl
 if __name__ == "__main__":
     num_classes = 10
 
-    # === Regularizers ===
-    regularizer_L1 = HierarchicalRegularizer({
-        "type": "global",
-        "norm": "L1",
-        "lambda": 0.05,
-    })
-    regularizer_L2 = HierarchicalRegularizer({
-        "type": "global",
-        "norm": "L2",
-        "lambda": 0.05,
-    })
-    regularizer_group_lasso = HierarchicalRegularizer({
-        "type": "layerwise",
-        "groups": "base_level",
-        "norm": "L1",
-        "inner_norm": "L2",
-        "lambda": 0.05,
-    })
-
     # === Datasets ===
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -169,10 +150,60 @@ if __name__ == "__main__":
 
     # === Benchmark ===
     benchmarks = {
+        # === No regularization ===
         "no_regularizer": None,
-        "L1": regularizer_L1,
-        "L2": regularizer_L2,
-        "group_lasso": regularizer_group_lasso,
+        
+        # === Global L1 (3 варианта) ===
+        "L1_lambda1": HierarchicalRegularizer({
+            "type": "global",
+            "norm": "L1",
+            "lambda": 1,
+        }),
+        "L1_lambda0.05": HierarchicalRegularizer({
+            "type": "global",
+            "norm": "L1",
+            "lambda": 0.05,
+        }),
+        
+        # === Global L2 (3 варианта) ===
+        "L2_lambda1": HierarchicalRegularizer({
+            "type": "global",
+            "norm": "L2",
+            "lambda": 1,
+        }),
+        "L2_lambda0.05": HierarchicalRegularizer({
+            "type": "global",
+            "norm": "L2",
+            "lambda": 0.05,
+        }),
+        "L2_lambda0.0012": HierarchicalRegularizer({
+            "type": "global",
+            "norm": "L2",
+            "lambda": 0.0012,
+        }),
+        
+        # === Group Lasso (3 варианта) ===
+        "group_lasso_lambda1": HierarchicalRegularizer({
+            "type": "layerwise",
+            "groups": "base_level",
+            "norm": "L1",
+            "inner_norm": "L2",
+            "lambda": 1,
+        }),
+        "group_lasso_lambda0.05": HierarchicalRegularizer({
+            "type": "layerwise",
+            "groups": "base_level",
+            "norm": "L1",
+            "inner_norm": "L2",
+            "lambda": 0.05,
+        }),
+        "group_lasso_lambda0.0035": HierarchicalRegularizer({
+            "type": "layerwise",
+            "groups": "base_level",
+            "norm": "L1",
+            "inner_norm": "L2",
+            "lambda": 0.0035,
+        }),
     }
 
     results = {}
