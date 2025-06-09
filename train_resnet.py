@@ -259,18 +259,19 @@ if __name__ == "__main__":
         }),
     }
 
+    model_name = 'resnet18'
     results = []
     for name, reg in benchmarks.items():
         print(f"\n=== Training with {name} ===")
         model = get_resnet18(num_classes).to(device)
-        writer = SummaryWriter(f"runs/test/{name}")
+        writer = SummaryWriter(f"runs/{model_name}/{name}")
         train(
             model,
             trainloader,
             regularizer=reg,
             writer=writer,
             epochs=20,
-            md_path=f"md_res/res_net/{name}_train_log.md",
+            md_path=f"md_res/{model_name}/{name}_train_log.md",
         )
         acc = evaluate(model, testloader)
         stats = weight_statistics(model)
@@ -298,7 +299,7 @@ if __name__ == "__main__":
 
         print()
 
-    summary_md = "summary_results.md"
+    summary_md = f"md_res/{model_name}/summary_results.md"
     header = (
         "| Benchmark | Accuracy | Zero frac | Near zero frac | Conv zero | Conv near zero | "
         "Linear zero | Linear near zero |\n"
