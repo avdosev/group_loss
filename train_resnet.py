@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from group_loss.group_loss import HierarchicalRegularizer
-from group_loss.base_classes import hierarchical_zero_statistics
 from group_loss.default_modules import HierarchicalConv2d, HierarchicalLinear
 from resnet import get_resnet34, get_resnet18
 
@@ -36,7 +35,7 @@ def train(
 ) -> None:
     model.train()
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     if writer is None:
         writer = SummaryWriter("runs/tmp")
 
@@ -60,6 +59,36 @@ def train(
             writer.add_scalar("Loss/CE", loss_ce.item(), step)
             writer.add_scalar("Loss/Reg", float(regularization_loss), step)
             writer.add_scalar("Loss/Total", loss.item(), step)
+
+            stats = weight_statistics(model)
+            filter_stats = filter_statistics(model)
+
+            writer.add_scalar("Weights/Zero_fraction", stats["zeros"] / stats["total"], step)
+            writer.add_scalar(
+                "Weights/Near_zero_fraction",
+                stats["near_zeros"] / stats["total"],
+                step,
+            )
+            writer.add_scalar(
+                "Conv_filters/Zero_fraction",
+                filter_stats["conv_zeros"] / filter_stats["conv_total"],
+                step,
+            )
+            writer.add_scalar(
+                "Conv_filters/Near_zero_fraction",
+                filter_stats["conv_near_zeros"] / filter_stats["conv_total"],
+                step,
+            )
+            writer.add_scalar(
+                "Linear_units/Zero_fraction",
+                filter_stats["linear_zeros"] / filter_stats["linear_total"],
+                step,
+            )
+            writer.add_scalar(
+                "Linear_units/Near_zero_fraction",
+                filter_stats["linear_near_zeros"] / filter_stats["linear_total"],
+                step,
+            )
             step += 1
 
             total_loss += loss.item()
@@ -83,19 +112,6 @@ def train(
                 with open(md_path, "a") as f:
                     f.write(row)
 
-        hier_stats = hierarchical_zero_statistics(model)
-        print("Hierarchical zero statistics:")
-        for tag, vals in hier_stats.items():
-            print(
-                f"  {tag}: zeros={vals['zeros']}/{vals['total']}, near_zeros={vals['near_zeros']}"
-            )
-            if vals["total"]:
-                writer.add_scalar(
-                    f"{tag}/Zero_fraction", vals["zeros"] / vals["total"], epoch
-                )
-                writer.add_scalar(
-                    f"{tag}/Near_zero_fraction", vals["near_zeros"] / vals["total"], epoch
-                )
     writer.close()
 
 
@@ -124,7 +140,7 @@ def weight_statistics(model: nn.Module, threshold: float = 1e-5) -> Dict[str, fl
         data = p.detach().cpu()
         total += data.numel()
         zeros += (data == 0).sum().item()
-        near_zeros += ((data.abs() < threshold) & (data != 0)).sum().item()
+        near_zeros += (data.abs() < threshold).sum().item()
     return {
         "total": total,
         "zeros": zeros,
@@ -186,7 +202,12 @@ if __name__ == "__main__":
         "no_regularizer": None,
         
         # === Global L1 (3 варианта) ===
-        "L1_lambda1": HierarchicalRegularizer({
+        "L1_lambda10": HierarchicalRegularizer({
+            "type": "global",
+            "norm": "L1",
+            "lambda": 10,
+        }),
+        "L1_lambda1_test": HierarchicalRegularizer({
             "type": "global",
             "norm": "L1",
             "lambda": 1,
@@ -238,69 +259,25 @@ if __name__ == "__main__":
         }),
     }
 
-    results = {}
+    results = []
     for name, reg in benchmarks.items():
         print(f"\n=== Training with {name} ===")
         model = get_resnet18(num_classes).to(device)
-        writer = SummaryWriter(f"runs/{name}")
+        writer = SummaryWriter(f"runs/test/{name}")
         train(
             model,
             trainloader,
             regularizer=reg,
             writer=writer,
-            epochs=10,
-            md_path=f"{name}_train_log.md",
+            epochs=20,
+            md_path=f"md_res/res_net/{name}_train_log.md",
         )
         acc = evaluate(model, testloader)
         stats = weight_statistics(model)
         filter_stats = filter_statistics(model)
-        hier_stats = hierarchical_zero_statistics(model)
 
-        writer.add_scalar("Eval/Accuracy", acc, 0)
-        writer.add_scalar("Weights/Zero_fraction", stats["zeros"] / stats["total"], 0)
-        writer.add_scalar(
-            "Weights/Near_zero_fraction",
-            stats["near_zeros"] / stats["total"],
-            0,
-        )
-        writer.add_scalar(
-            "Conv_filters/Zero_fraction",
-            filter_stats["conv_zeros"] / filter_stats["conv_total"],
-            0,
-        )
-        writer.add_scalar(
-            "Conv_filters/Near_zero_fraction",
-            filter_stats["conv_near_zeros"] / filter_stats["conv_total"],
-            0,
-        )
-        writer.add_scalar(
-            "Linear_units/Zero_fraction",
-            filter_stats["linear_zeros"] / filter_stats["linear_total"],
-            0,
-        )
-        writer.add_scalar(
-            "Linear_units/Near_zero_fraction",
-            filter_stats["linear_near_zeros"] / filter_stats["linear_total"],
-            0,
-        )
-        print("Hierarchical zero statistics:")
-        for tag, vals in hier_stats.items():
-            print(
-                f"  {tag}: zeros={vals['zeros']}/{vals['total']}, near_zeros={vals['near_zeros']}"
-            )
-        for tag, vals in hier_stats.items():
-            if vals["total"]:
-                writer.add_scalar(
-                    f"{tag}/Zero_fraction", vals["zeros"] / vals["total"], 0
-                )
-                writer.add_scalar(
-                    f"{tag}/Near_zero_fraction",
-                    vals["near_zeros"] / vals["total"],
-                    0,
-                )
-        writer.close()
-
-        results[name] = {
+        results.append({
+            'name': name,
             "accuracy": acc,
             "zero_frac": stats["zeros"] / stats["total"],
             "near_zero_frac": stats["near_zeros"] / stats["total"],
@@ -308,16 +285,18 @@ if __name__ == "__main__":
             "conv_near_zero_frac": filter_stats["conv_near_zeros"] / filter_stats["conv_total"],
             "linear_zero_frac": filter_stats["linear_zeros"] / filter_stats["linear_total"],
             "linear_near_zero_frac": filter_stats["linear_near_zeros"] / filter_stats["linear_total"],
-        }
+        })
 
-    print("\n=== Summary ===")
-    for k, v in results.items():
-        print(
-            f"{k}: accuracy={v['accuracy']:.2f}%, "
-            f"zeros={v['zero_frac']:.4f}, near_zeros={v['near_zero_frac']:.4f}, "
-            f"conv_zero={v['conv_zero_frac']:.4f}, conv_near_zero={v['conv_near_zero_frac']:.4f}, "
-            f"linear_zero={v['linear_zero_frac']:.4f}, linear_near_zero={v['linear_near_zero_frac']:.4f}"
-        )
+        print("\n=== Summary ===")
+        for v in results:
+            print(
+                f"{v['name']}: accuracy={v['accuracy']:.2f}%, "
+                f"zeros={v['zero_frac']:.4f}, near_zeros={v['near_zero_frac']:.4f}, "
+                f"conv_zero={v['conv_zero_frac']:.4f}, conv_near_zero={v['conv_near_zero_frac']:.4f}, "
+                f"linear_zero={v['linear_zero_frac']:.4f}, linear_near_zero={v['linear_near_zero_frac']:.4f}"
+            )
+
+        print()
 
     summary_md = "summary_results.md"
     header = (
@@ -328,9 +307,9 @@ if __name__ == "__main__":
     with open(summary_md, "w") as f:
         f.write(header)
         f.write(sep)
-        for k, v in results.items():
+        for v in results:
             f.write(
-                f"| {k} | {v['accuracy']:.2f}% | {v['zero_frac']:.4f} | {v['near_zero_frac']:.4f} | "
+                f"| {v['name']} | {v['accuracy']:.2f}% | {v['zero_frac']:.4f} | {v['near_zero_frac']:.4f} | "
                 f"{v['conv_zero_frac']:.4f} | {v['conv_near_zero_frac']:.4f} | "
                 f"{v['linear_zero_frac']:.4f} | {v['linear_near_zero_frac']:.4f} |\n"
             )

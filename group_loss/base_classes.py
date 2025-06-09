@@ -51,7 +51,7 @@ class HierarchicalGroupWrapper(nn.Module):
         abs_max = w.abs().max(dim=1).values
         total = abs_max.numel()
         zeros = (abs_max == 0).sum().item()
-        near_zeros = ((abs_max < threshold) & (abs_max != 0)).sum().item()
+        near_zeros = (abs_max < threshold).sum().item()
         return {"total": total, "zeros": zeros, "near_zeros": near_zeros}
 
     def forward(self, x):
@@ -84,71 +84,4 @@ def make_hierarchy(blocks: list, group_level, name=''):
     if isinstance(group_level, str):
         group_level = [group_level]
     return [HierarchicalGroup(blocks, group_level, name)]
-
-
-def hierarchical_zero_statistics(
-    model: HierarchicalModule, threshold: float = 1e-5
-) -> Dict[str, Dict[str, int]]:
-    """Return zero/near-zero counts for each hierarchy tag in *model*.
-
-    Parameters are aggregated according to :class:`HierarchicalGroup` tags.  For
-    the special tag ``"base_level"`` the counts are computed per filter/neurone
-    using :meth:`HierarchicalGroupWrapper.count_zero_groups`.  For all other
-    tags a group is considered **zero** when **all** its parameters are exactly
-    zero and **near-zero** when the maximum absolute value is below ``threshold``
-    while not being exactly zero.
-    """
-
-    stats: Dict[str, Dict[str, int]] = defaultdict(
-        lambda: {"total": 0, "zeros": 0, "near_zeros": 0}
-    )
-
-    def _gather_weights(grp: HierarchicalGroup) -> torch.Tensor:
-        tensors = []
-        if isinstance(grp.module, HierarchicalGroupWrapper):
-            tensors.append(grp.module.get_weights().detach().cpu().view(-1))
-        elif isinstance(grp.module, list):
-            for item in grp.module:
-                if isinstance(item, HierarchicalGroupWrapper):
-                    tensors.append(item.get_weights().detach().cpu().view(-1))
-                elif isinstance(item, HierarchicalGroup):
-                    tensors.append(_gather_weights(item))
-        return torch.cat(tensors) if tensors else torch.tensor([])
-
-    def _traverse(grp: HierarchicalGroup) -> None:
-        if isinstance(grp.module, HierarchicalGroupWrapper):
-            unit_stats = grp.module.count_zero_groups(threshold)
-            for tag in grp.groups:
-                if tag == "base_level":
-                    stats[tag]["total"] += unit_stats["total"]
-                    stats[tag]["zeros"] += unit_stats["zeros"]
-                    stats[tag]["near_zeros"] += unit_stats["near_zeros"]
-                else:
-                    w = _gather_weights(grp)
-                    if w.numel():
-                        is_zero = int(torch.all(w == 0).item())
-                        is_near = int(w.abs().max().item() < threshold and not is_zero)
-                        stats[tag]["total"] += 1
-                        stats[tag]["zeros"] += is_zero
-                        stats[tag]["near_zeros"] += is_near
-        else:  # grp.module is a list of sub-groups/modules
-            w = _gather_weights(grp)
-            if w.numel():
-                is_zero = int(torch.all(w == 0).item())
-                is_near = int(w.abs().max().item() < threshold and not is_zero)
-                for tag in grp.groups:
-                    stats[tag]["total"] += 1
-                    stats[tag]["zeros"] += is_zero
-                    stats[tag]["near_zeros"] += is_near
-            if isinstance(grp.module, list):
-                for item in grp.module:
-                    if isinstance(item, HierarchicalGroup):
-                        _traverse(item)
-                    elif isinstance(item, HierarchicalGroupWrapper):
-                        _traverse(item.get_param_groups())
-
-    for root in model.get_param_groups():
-        _traverse(root)
-
-    return stats
     
