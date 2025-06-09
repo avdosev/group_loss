@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from group_loss.group_loss import HierarchicalRegularizer
+from group_loss.base_classes import hierarchical_zero_statistics
 from group_loss.default_modules import HierarchicalConv2d, HierarchicalLinear
 from resnet import get_resnet34, get_resnet18
 
@@ -239,6 +240,7 @@ if __name__ == "__main__":
         acc = evaluate(model, testloader)
         stats = weight_statistics(model)
         filter_stats = filter_statistics(model)
+        hier_stats = hierarchical_zero_statistics(model)
 
         writer.add_scalar("Eval/Accuracy", acc, 0)
         writer.add_scalar("Weights/Zero_fraction", stats["zeros"] / stats["total"], 0)
@@ -267,6 +269,21 @@ if __name__ == "__main__":
             filter_stats["linear_near_zeros"] / filter_stats["linear_total"],
             0,
         )
+        print("Hierarchical zero statistics:")
+        for tag, vals in hier_stats.items():
+            print(
+                f"  {tag}: zeros={vals['zeros']}/{vals['total']}, near_zeros={vals['near_zeros']}"
+            )
+        for tag, vals in hier_stats.items():
+            if vals["total"]:
+                writer.add_scalar(
+                    f"{tag}/Zero_fraction", vals["zeros"] / vals["total"], 0
+                )
+                writer.add_scalar(
+                    f"{tag}/Near_zero_fraction",
+                    vals["near_zeros"] / vals["total"],
+                    0,
+                )
         writer.close()
 
         results[name] = {
