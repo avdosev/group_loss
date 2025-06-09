@@ -82,6 +82,20 @@ def train(
             else:
                 with open(md_path, "a") as f:
                     f.write(row)
+
+        hier_stats = hierarchical_zero_statistics(model)
+        print("Hierarchical zero statistics:")
+        for tag, vals in hier_stats.items():
+            print(
+                f"  {tag}: zeros={vals['zeros']}/{vals['total']}, near_zeros={vals['near_zeros']}"
+            )
+            if vals["total"]:
+                writer.add_scalar(
+                    f"{tag}/Zero_fraction", vals["zeros"] / vals["total"], epoch
+                )
+                writer.add_scalar(
+                    f"{tag}/Near_zero_fraction", vals["near_zeros"] / vals["total"], epoch
+                )
     writer.close()
 
 
