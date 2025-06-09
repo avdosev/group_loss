@@ -60,39 +60,39 @@ def train(
             writer.add_scalar("Loss/Reg", float(regularization_loss), step)
             writer.add_scalar("Loss/Total", loss.item(), step)
 
-            stats = weight_statistics(model)
-            filter_stats = filter_statistics(model)
-
-            writer.add_scalar("Weights/Zero_fraction", stats["zeros"] / stats["total"], step)
-            writer.add_scalar(
-                "Weights/Near_zero_fraction",
-                stats["near_zeros"] / stats["total"],
-                step,
-            )
-            writer.add_scalar(
-                "Conv_filters/Zero_fraction",
-                filter_stats["conv_zeros"] / filter_stats["conv_total"],
-                step,
-            )
-            writer.add_scalar(
-                "Conv_filters/Near_zero_fraction",
-                filter_stats["conv_near_zeros"] / filter_stats["conv_total"],
-                step,
-            )
-            writer.add_scalar(
-                "Linear_units/Zero_fraction",
-                filter_stats["linear_zeros"] / filter_stats["linear_total"],
-                step,
-            )
-            writer.add_scalar(
-                "Linear_units/Near_zero_fraction",
-                filter_stats["linear_near_zeros"] / filter_stats["linear_total"],
-                step,
-            )
             step += 1
 
             total_loss += loss.item()
 
+        stats = weight_statistics(model)
+        filter_stats = filter_statistics(model)
+
+        writer.add_scalar("Weights/Zero_fraction", stats["zeros"] / stats["total"], step)
+        writer.add_scalar(
+            "Weights/Near_zero_fraction",
+            stats["near_zeros"] / stats["total"],
+            step,
+        )
+        writer.add_scalar(
+            "Conv_filters/Zero_fraction",
+            filter_stats["conv_zeros"] / filter_stats["conv_total"],
+            step,
+        )
+        writer.add_scalar(
+            "Conv_filters/Near_zero_fraction",
+            filter_stats["conv_near_zeros"] / filter_stats["conv_total"],
+            step,
+        )
+        writer.add_scalar(
+            "Linear_units/Zero_fraction",
+            filter_stats["linear_zeros"] / filter_stats["linear_total"],
+            step,
+        )
+        writer.add_scalar(
+            "Linear_units/Near_zero_fraction",
+            filter_stats["linear_near_zeros"] / filter_stats["linear_total"],
+            step,
+        )
         last = loss.item()
         avg = total_loss / len(trainloader)
         print(f"Epoch {epoch+1}, Last Loss: {last:.4f}")
