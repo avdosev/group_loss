@@ -102,6 +102,7 @@ def train(
         print(f"Epoch {epoch+1}, Avg Loss: {avg:.4f}")
 
         if md_path is not None:
+            os.makedirs(os.path.dirname(md_path), exist_ok=True)
             header = "| Epoch | Last Loss | Total Loss | Avg Loss |\n"
             sep = "| --- | --- | --- | --- |\n"
             row = f"| {epoch+1} | {last:.4f} | {total_loss:.4f} | {avg:.4f} |\n"
@@ -307,6 +308,7 @@ if __name__ == "__main__":
         "Linear zero | Linear near zero |\n"
     )
     sep = "| --- | --- | --- | --- | --- | --- | --- | --- |\n"
+    os.makedirs(os.path.dirname(summary_md), exist_ok=True)
     with open(summary_md, "w") as f:
         f.write(header)
         f.write(sep)
