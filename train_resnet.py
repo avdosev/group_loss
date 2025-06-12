@@ -22,6 +22,7 @@ if torch.cuda.is_available():
 elif torch.backends.mps.is_available():
     device = 'mps'
 
+print('device:', device)
 device = torch.device(device)
 
 
@@ -56,14 +57,15 @@ def train(
             loss.backward()
             optimizer.step()
 
-            writer.add_scalar("Loss/CE", loss_ce.item(), step)
-            writer.add_scalar("Loss/Reg", float(regularization_loss), step)
-            writer.add_scalar("Loss/Total", loss.item(), step)
 
             step += 1
 
             total_loss += loss.item()
 
+        writer.add_scalar("Loss/CE", loss_ce.item(), step)
+        writer.add_scalar("Loss/Reg", float(regularization_loss), step)
+        writer.add_scalar("Loss/Total", loss.item(), step)
+        
         stats = weight_statistics(model)
         filter_stats = filter_statistics(model)
 
@@ -207,7 +209,7 @@ if __name__ == "__main__":
             "norm": "L1",
             "lambda": 10,
         }),
-        "L1_lambda1_test": HierarchicalRegularizer({
+        "L1_lambda1": HierarchicalRegularizer({
             "type": "global",
             "norm": "L1",
             "lambda": 1,
@@ -259,11 +261,11 @@ if __name__ == "__main__":
         }),
     }
 
-    model_name = 'resnet18'
+    model_name = 'resnet34'
     results = []
     for name, reg in benchmarks.items():
         print(f"\n=== Training with {name} ===")
-        model = get_resnet18(num_classes).to(device)
+        model = get_resnet34(num_classes).to(device)
         writer = SummaryWriter(f"runs/{model_name}/{name}")
         train(
             model,
