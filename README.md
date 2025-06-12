@@ -23,20 +23,24 @@
 
 ## Пример использования:
 ```python
-from model import HierarchicalResNet, RegularizationCalculator
+from resnet import HierarchicalResNet
+from group_loss.group_loss import HierarchicalRegularizer
 
 # Инициализация модели с группировкой параметров
-model = HierarchicalResNet(num_blocks=[2, 2, 2, 2], num_class=10)
+model = HierarchicalResNet(num_blocks=[2, 2, 2, 2], num_classes=10)
 
 # Конфигурация регуляризации
-config = [
-    {"groups": ["base_level"], "norm": "L2", "lambda": 0.001} # L2 для фильтров
-    {"groups": ["layer"], "norm": "L1", "lambda": 0.01},  # L1 для Residual-слоев
-]
+config = {
+    "type": "hierarchical",
+    "children": [
+        {"groups": "base_level", "norm": "L2", "lambda": 0.001},  # L2 для фильтров
+        {"groups": "layer", "norm": "L1", "lambda": 0.01},        # L1 для Residual-слоев
+    ],
+}
 
 # Расчет потерь
-regularizer = RegularizationCalculator(model)
-loss = criterion(outputs, labels) + regularizer.compute_loss(config)
+regularizer = HierarchicalRegularizer(config)
+loss = criterion(outputs, labels) + regularizer(model)
 ```
 
 ### Эффекты групповой регуляризации
