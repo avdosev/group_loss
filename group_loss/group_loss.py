@@ -2,6 +2,10 @@ import torch
 import torch.nn as nn
 from typing import List, Union, Dict, Any
 
+# p-norm degree for L0 approximation
+L0_P = 0.1
+L0_EPS = 1e-8
+
 # External project imports (assumed to exist in the repo)
 from group_loss.base_classes import (
     HierarchicalGroupWrapper,
@@ -61,7 +65,9 @@ class HierarchicalRegularizer(nn.Module):
         if node_type == "hierarchical":
             loss = torch.tensor(0.0, device=self._infer_device(search_space))
             for child in node_cfg.get("children", []):
-                loss = loss + self._apply_node(child, self._filter_by_tag(search_space, tag))
+                loss = loss + self._apply_node(
+                    child, self._filter_by_tag(search_space, tag)
+                )
             return loss
 
         # The rest (global / layerwise) do impose a penalty
@@ -73,11 +79,15 @@ class HierarchicalRegularizer(nn.Module):
             outer_norm: str = node_cfg.get("norm", "L2").upper()
             inner_norm: str = node_cfg.get("inner_norm", "L2").upper()
             active_groups = self._filter_by_tag(search_space, tag)
-            base_loss = self._compute_penalty(node_type, active_groups, lam, outer_norm, inner_norm)
+            base_loss = self._compute_penalty(
+                node_type, active_groups, lam, outer_norm, inner_norm
+            )
 
         # Recurse even for global / layerwise (children allowed)
         for child_cfg in node_cfg.get("children", []):
-            base_loss = base_loss + self._apply_node(child_cfg, self._filter_by_tag(search_space, tag))
+            base_loss = base_loss + self._apply_node(
+                child_cfg, self._filter_by_tag(search_space, tag)
+            )
         return base_loss
 
     # ------------------------------------------------------------------
@@ -138,6 +148,9 @@ class HierarchicalRegularizer(nn.Module):
             return torch.sum(torch.abs(mat), dim=1)
         elif inner == "L2":
             return torch.norm(mat, p=2, dim=1)
+        elif inner in ("L0APPROX", "L0"):
+            # Σ |w|^p   (p ≪ 1) → differentiable surrogate of non-zero count
+            return torch.sum(torch.pow(mat.abs() + L0_EPS, L0_P), dim=1)
         elif inner == "NONE":
             return mat.mean(dim=1) * 0  # effectively disables contribution
         else:
@@ -177,7 +190,9 @@ class HierarchicalRegularizer(nn.Module):
                         matched.extend(self._filter_by_tag([item], tag))
         return matched
 
-    def _collect_weights(self, groups: List[HierarchicalGroup], *, flatten: bool) -> torch.Tensor:
+    def _collect_weights(
+        self, groups: List[HierarchicalGroup], *, flatten: bool
+    ) -> torch.Tensor:
         tensors: List[torch.Tensor] = []
         for g in groups:
             if isinstance(g.module, HierarchicalGroupWrapper):
@@ -190,7 +205,11 @@ class HierarchicalRegularizer(nn.Module):
                         tensors.append(w.view(-1) if flatten else w)
                     elif isinstance(item, HierarchicalGroup):
                         tensors.append(self._collect_weights([item], flatten=True))
-        return torch.cat(tensors) if tensors else torch.empty(0, device=self._infer_device(groups))
+        return (
+            torch.cat(tensors)
+            if tensors
+            else torch.empty(0, device=self._infer_device(groups))
+        )
 
     @staticmethod
     def _infer_device(groups: List[HierarchicalGroup]) -> torch.device:
