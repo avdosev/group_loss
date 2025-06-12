@@ -1,0 +1,5 @@
+# Python dependencies for group_loss
+# GPU-enabled torch already included in the base image
+torch
+torchvision
+tensorboard
